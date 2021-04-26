@@ -1,0 +1,129 @@
+LIBNAME DCM "M:\myrthe SAS\2019\rSMS_DCM"; 
+PROC IMPORT OUT= DCM.node
+            DATAFILE= "M:\myrthe SAS\2019\rSMS_DCM\SAS_DCM_88.xlsx" 
+            DBMS=XLSX REPLACE;
+     GETNAMES=YES;
+     DATAROW=2; 
+RUN;
+*data set under paper_resources folder;
+
+TITLE'check for sig group differences in descriptive statistics';
+proc glm data=DCM.node; class Dx; model Age = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model MMSETot = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model CDRTot = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model BoxScore = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model RSMS_EX = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model max_trans = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+proc glm data=DCM.node; class Dx; model max_rot = Dx /SS3 effectsize; lsmeans Dx / pdiff=control('ONC'); run; quit;
+*all sig. different;
+
+proc sort data = DCM.node; by Dx; run;
+proc means data = DCM.node; var max_trans max_rot; by Dx; run;
+
+data DCM.node; set DCM.node;
+PAG_output = (R_dlPAG_R_dmThal2 + R_dlPAG_L_dmThal2 + R_dlPAG_ACC + R_dlPAG_R_vAI + R_dlPAG_L_vAI + R_dlPAG_R_Hypo + R_dlPAG_L_Hypo + R_dlPAG_R_Amy + R_dlPAG_L_Amy); 
+PAG_output_cort = (R_dlPAG_ACC + R_dlPAG_R_vAI + R_dlPAG_L_vAI);
+PAG_output_subc = (R_dlPAG_R_dmThal2 + R_dlPAG_L_dmThal2 + R_dlPAG_R_Hypo + R_dlPAG_L_Hypo + R_dlPAG_R_Amy + R_dlPAG_L_Amy); 
+PAG_output_HT = (R_dlPAG_R_Hypo + R_dlPAG_L_Hypo); 
+PAG_output_thal = (R_dlPAG_R_dmThal2 + R_dlPAG_L_dmThal2); 
+PAG_output_amy = (R_dlPAG_R_Amy + R_dlPAG_L_Amy);
+
+PAG_input = (R_dmThal2_R_dlPAG + L_dmThal2_R_dlPAG + ACC_R_dlPAG + R_vAI_R_dlPAG + L_vAI_R_dlPAG + R_Hypo_R_dlPAG + L_Hypo_R_dlPAG + R_Amy_R_dlPAG + L_Amy_R_dlPAG);
+PAG_input_cort = (ACC_R_dlPAG + R_vAI_R_dlPAG + L_vAI_R_dlPAG);
+PAG_input_subc = (R_dmThal2_R_dlPAG + L_dmThal2_R_dlPAG + R_Hypo_R_dlPAG + L_Hypo_R_dlPAG + R_Amy_R_dlPAG + L_Amy_R_dlPAG);
+PAG_input_amy = (R_Amy_R_dlPAG + L_Amy_R_dlPAG);
+run; 
+
+*When I need the data sets for matlab;
+proc export 
+  data=DCM.node
+  dbms=XLSX
+  outfile="M:\myrthe SAS\2019\rSMS_DCM\SAS_DCM_88.xlsx"
+  replace;
+run;
+
+TITLE'deleting 2 outliers based on the distance from the mean for each summary score (z-scores) calculated in matlab';
+data DCM.node_out; set DCM.node;
+	if PIDN = 15600 then delete;*bvFTD patient;
+	if PIDN = 6857 then delete;*ONC patient;
+run;
+
+ TITLE'selecting diagnostic groups';
+data DCM.node_ONC; set DCM.node_out;
+	if Dx = 'ONC' then output;
+run;
+data DCM.node_bvFTD; set DCM.node_out;
+	if Dx = 'bvFTD' then output;
+run;
+
+
+TITLE'check distribution sum estimates';
+proc univariate data = DCM.node_out plots; var PAG_output PAG_output_cort PAG_output_subc PAG_input PAG_input_cort PAG_input_subc; run;
+
+TITLE'does sum estimate predict RSMS EX';
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output_cort Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output_subc Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_input Dx /SS3 effectsize; run; quit;
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_input_cort Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_input_subc Dx /SS3 effectsize; run; quit; 
+
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output_HT Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output_amy Dx /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_out; class Dx; model RSMS_ex = PAG_output_thal Dx /SS3 effectsize; run; quit; 
+
+proc glm data=DCM.node_ONC; model RSMS_ex = PAG_output_thal  /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = PAG_output_thal /SS3 effectsize; run; quit; 
+
+
+TITLE'does individual PAG related node connections predict RSMS EX; ONC';
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_R_dmThal2 /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_L_dmThal2 /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_R_Hypo /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_L_Hypo /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_L_vAI /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_R_vAI /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_ACC /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_R_Amy /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dlPAG_L_Amy /SS3 effectsize; run; quit; 
+
+proc glm data=DCM.node_ONC; model RSMS_ex = R_dmThal2_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = L_dmThal2_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_Hypo_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = L_Hypo_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_vAI_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = l_vAI_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = ACC_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = R_Amy_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_ONC; model RSMS_ex = L_Amy_R_dlPAG /SS3 effectsize; run; quit; 
+
+
+TITLE'does individual PAG related node connections predict RSMS EX; bvFTD';
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_R_dmThal2 /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_L_dmThal2 /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_R_Hypo /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_L_Hypo /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_L_vAI /SS3 effectsize; run; quit; *;
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_R_vAI /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_ACC /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_R_Amy /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dlPAG_L_Amy /SS3 effectsize; run; quit; 
+
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_dmThal2_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = L_dmThal2_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_Hypo_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = L_Hypo_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_vAI_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = l_vAI_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = ACC_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = R_Amy_R_dlPAG /SS3 effectsize; run; quit; 
+proc glm data=DCM.node_bvFTD; model RSMS_ex = L_Amy_R_dlPAG /SS3 effectsize; run; quit; 
+
+
+*When I need the data sets for R;
+proc export 
+  data=DCM.node_out
+  dbms=XLSX
+  outfile="M:\myrthe SAS\2019\rSMS_DCM\SAS_DCM_86.xlsx"
+  replace;
+run;
