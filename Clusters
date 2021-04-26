@@ -1,0 +1,36 @@
+LIBNAME DCM "M:\myrthe SAS\2019\rSMS_DCM"; 
+PROC IMPORT OUT= DCM.clus
+            DATAFILE= "M:\myrthe SAS\2019\rSMS_DCM\PAG_all_clus_output_86.xlsx" 
+            DBMS=XLSX REPLACE;
+     GETNAMES=YES;
+     DATAROW=2; 
+RUN;
+
+*How many PIDNs belong to each cluster group;
+proc freq data=DCM.clus; table Clus; run; 
+
+TITLE'correlation between input and output cort/subcort scores';
+proc glm data=DCM.clus; model PAG_input_cort = PAG_input_subc /SS3 effectsize; run; quit;
+proc glm data=DCM.clus; model PAG_output_cort = PAG_output_subc /SS3 effectsize; run; quit;*only output;
+
+*selecting diagnostic group
+data DCM.ONC; set DCM.clus;
+  if dx = 'ONC' then output;
+run;
+data DCM.bvFTD; set DCM.clus;
+  if dx = 'bvFTD' then output;
+run;
+  
+TITLE'can cluster membership predict RSMS score';
+proc glm data=DCM.ONC; class Clus ; model RSMS_ex = Clus /SS3 effectsize; lsmeans Clus/ pdiff; run; quit;
+proc glm data=DCM.bvFTD; class Clus ; model RSMS_ex = Clus /SS3 effectsize; lsmeans Clus/ pdiff; run; quit;
+proc glm data=DCM.clus; class Clus ; model RSMS_ex = Clus /SS3 effectsize; lsmeans Clus/ pdiff; run; quit;
+
+data DCM.clus; set DCM.clus;
+	if clus = '1' then clus_comb = "1";
+	if clus = '3' then clus_comb = "3";
+run;
+
+*chisq do bvFTDs belong to sig different cluster than ONCs;
+proc freq data=DCM.clus; tables Clus_comb*dx / chisq expected norow nocol nopercent ;
+run;
