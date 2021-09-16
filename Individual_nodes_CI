@@ -6,11 +6,6 @@ PROC IMPORT OUT= DCM.rSMS
      DATAROW=2; 
 RUN;
 
-data DCM.rSMS; set DCM.rSMS;
-	if PIDN = 15600 then delete;*bvFTD;
-	if PIDN = 6857 then delete;*ONC;
-run;
-
 proc sort data = DCM.rSMS; by Dx; run;
 proc means data = DCM.rSMS; var RSMS_ex; by Dx; run;
 
